@@ -26,8 +26,12 @@ def _conv_block(inputs, filters, kernel, strides , kernel_regularizer):
 
     if kernel_regularizer == 1:
         x = layers.Conv2D(filters, kernel, padding='same', strides=strides ,  kernel_regularizer=reg)(inputs)
-    else:
+    elif kernel_regularizer == 2:
         x = layers.Conv2D(filters, kernel, padding='same', strides=strides ,  kernel_regularizer=tf.keras.regularizers.L2(reg))(inputs)
+    else:
+        x = layers.Conv2D(filters, kernel, padding='same', strides=strides ,  kernel_regularizer=tf.keras.regularizers.L2(1e-2))(inputs)
+
+        #x = layers.Conv2D(512, (1,4), padding='same', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(1e-2))(x)
 
     x = layers.BatchNormalization()(x)
     x = relu6(x)
@@ -62,9 +66,11 @@ def _bottleneck(inputs, filters, kernel, t, s, r=False, kernel_regularizer=1):
 
     if kernel_regularizer == 1:
         x = layers.Conv2D(filters, (1, 1), strides=(1, 1), padding='same', kernel_regularizer=reg)(x)
+    elif kernel_regularizer == 2:
+        x = layers.Conv2D(filters, kernel, padding='same', strides=(1, 1) ,  kernel_regularizer=tf.keras.regularizers.L2(reg))(inputs)
     else:
-        x = layers.Conv2D(filters, (1, 1), strides=(1, 1), padding='same', kernel_regularizer=tf.keras.regularizers.L2(reg))(x)
-
+        x = layers.Conv2D(filters, kernel, padding='same', strides=(1, 1) ,   kernel_regularizer=tf.keras.regularizers.L2(1e-2))(inputs)
+    
     x = layers.BatchNormalization()(x)
 
     if r:
@@ -116,21 +122,27 @@ def vgg_style(x, reg=None):
     The original feature extraction structure from CRNN paper.
     Related paper: https://ieeexplore.ieee.org/abstract/document/7801919
     """
-    x = layers.Conv2D(64, 3, padding='same', kernel_regularizer=reg)(x)
-    x = layers.ReLU(6)(x)
+    x = _conv_block(x ,64 , (3,3) , strides=(1,1), kernel_regularizer=1)
+    #x = layers.Conv2D(64, 3, padding='same', kernel_regularizer=reg)(x)
+    #x = layers.ReLU(6)(x)
     x = layers.MaxPool2D(pool_size=2, padding='same')(x)
 
-    x = layers.Conv2D(128, 3, padding='same', use_bias=False, kernel_regularizer=reg)(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.ReLU(6)(x)
+    x = _inverted_residual_block(x, 128 , (3,3) , t = 1 , strides=1 , n=1, kernel_regularizer=1)
+    #x = layers.Conv2D(128, 3, padding='same', use_bias=False, kernel_regularizer=reg)(x)
+    #x = layers.BatchNormalization()(x)
+    #x = layers.ReLU(6)(x)
     x = layers.MaxPool2D(pool_size=2, padding='same')(x)
 
-    x = layers.Conv2D(256, 3, padding='same', use_bias=False, kernel_regularizer=reg)(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.ReLU(6)(x)
-    x = layers.Conv2D(256, 3, padding='same', use_bias=False, kernel_regularizer=reg)(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.ReLU(6)(x)
+    x = _inverted_residual_block(x, 256 , (3,3) , t = 6 , strides=1 , n=1, kernel_regularizer=1)
+    #x = layers.Conv2D(256, 3, padding='same', use_bias=False, kernel_regularizer=reg)(x)
+    #x = layers.BatchNormalization()(x)
+    #x = layers.ReLU(6)(x)
+
+    x = _inverted_residual_block(x, 256 , (3,3) , t = 6 , strides=1 , n=1, kernel_regularizer=1)
+    #x = layers.Conv2D(256, 3, padding='same', use_bias=False, kernel_regularizer=reg)(x)
+    #x = layers.BatchNormalization()(x)
+    #x = layers.ReLU(6)(x)
+
     x = layers.MaxPool2D(pool_size=2, strides=(2, 2), padding='same')(x)
 
     x = separable_conv(x, p_filters=512, d_kernel_size=(3,3), d_strides=(1,1), d_padding='same', reg=reg)
@@ -170,25 +182,25 @@ def build_stn(img, interpolation_size, slice=False, reg=None):
     #x = layers.ReLU(6)(x)
     #x = layers.MaxPool2D(pool_size=(2, 2))(x)
 
-    x = _inverted_residual_block(x, 128 , (5,5) , t = 1 , strides=1 , n=1, kernel_regularizer=1) 
+    x = _inverted_residual_block(x, 128 , (3,3) , t = 1 , strides=1 , n=1, kernel_regularizer=1) 
     x = layers.MaxPool2D(pool_size=(2, 2))(x)
     #x = layers.Conv2D(128, (3, 3), padding='SAME', use_bias=False, kernel_regularizer=reg)(x)
     #x = layers.BatchNormalization()(x)
     #x = layers.ReLU(6)(x)
 
-    x1 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=1, kernel_regularizer=reg) (x)
+    x1 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=1) (x)
     x1 = layers.Conv2D(128, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=1, kernel_regularizer=reg)(x1)
     #x1 = layers.Conv2D(128, (3, 3), padding='SAME', dilation_rate=1, use_bias=False, kernel_regularizer=reg)(x)
     x1 = layers.BatchNormalization()(x1)
     x1 = layers.ReLU(6)(x1)
 
-    x2 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=2, kernel_regularizer=reg) (x)
+    x2 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=2) (x)
     x2 = layers.Conv2D(128, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=2, kernel_regularizer=reg)(x2)
     #x2 = layers.Conv2D(128, (3, 3), padding='SAME', dilation_rate=2, use_bias=False, kernel_regularizer=reg)(x)
     x2 = layers.BatchNormalization()(x2)
     x2 = layers.ReLU(6)(x2)
 
-    x3 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=3, kernel_regularizer=reg) (x)
+    x3 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=3) (x)
     x3 = layers.Conv2D(128, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=3, kernel_regularizer=reg)(x3)
     #x3 = layers.Conv2D(128, (3, 3), padding='SAME', dilation_rate=3, use_bias=False, kernel_regularizer=reg)(x)
     x3 = layers.BatchNormalization()(x3)
@@ -237,13 +249,13 @@ def build_stn2(img, interpolation_size, slice=False):
     #x = layers.BatchNormalization()(x)
     #x = layers.ReLU(6)(x)
     
-    x1 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=1, kernel_regularizer=tf.keras.regularizers.L2(reg)) (x)
+    x1 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=1) (x)
     x1 = layers.Conv2D(256, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=1, kernel_regularizer=tf.keras.regularizers.L2(reg))(x1)
     #x1 = layers.Conv2D(256, (3, 3), padding='SAME', dilation_rate=1, use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(reg))(x)
     x1 = layers.BatchNormalization()(x1)
     x1 = layers.ReLU(6)(x1)
 
-    x2 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=2, kernel_regularizer=tf.keras.regularizers.L2(reg)) (x)
+    x2 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=2) (x)
     x2 = layers.Conv2D(256, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=2, kernel_regularizer=tf.keras.regularizers.L2(reg))(x2)
     #x2 = layers.Conv2D(256, (3, 3), padding='SAME', dilation_rate=2, use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(reg))(x)
     x2 = layers.BatchNormalization()(x2)
@@ -293,12 +305,17 @@ def build_model(num_classes,
 
     x = vgg_style(interpolate_img, reg=tf.keras.regularizers.L2(reg))
     x = layers.Reshape((1, 4, 512))(x)
-    x = layers.Conv2D(512, (1,4), padding='same', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(1e-2))(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.ReLU(6)(x)
-    x = layers.Conv2D(512, (1,4), padding='same', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(1e-2))(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.ReLU(6)(x)
+   
+    x = _inverted_residual_block(x, 512 , (1,4) , t = 6 , strides=1 , n=1, kernel_regularizer=3)
+    #x = layers.Conv2D(512, (1,4), padding='same', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(1e-2))(x)
+    #x = layers.BatchNormalization()(x)
+    #x = layers.ReLU(6)(x)
+    
+    x = _inverted_residual_block(x, 512 , (1,4) , t = 6 , strides=1 , n=1, kernel_regularizer=3)
+    #x = layers.Conv2D(512, (1,4), padding='same', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(1e-2))(x)
+    #x = layers.BatchNormalization()(x)
+    #x = layers.ReLU(6)(x)
+
     x = layers.Reshape((-1, 512))(x)
     x = layers.Dense(units=num_classes, name='ctc_logits')(x)
     
