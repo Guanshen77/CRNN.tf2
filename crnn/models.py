@@ -24,12 +24,12 @@ def _conv_block(inputs, filters, kernel, strides , kernel_regularizer):
         Output tensor.
     """
 
-    if kernel_regularizer == 1:
+    if kernel_regularizer == 0:
+        x = layers.Conv2D(filters, kernel, padding='same', strides=strides ,  kernel_regularizer=None)(inputs)
+    elif kernel_regularizer == 1:
         x = layers.Conv2D(filters, kernel, padding='same', strides=strides ,  kernel_regularizer=reg)(inputs)
-    elif kernel_regularizer == 2:
-        x = layers.Conv2D(filters, kernel, padding='same', strides=strides ,  kernel_regularizer=tf.keras.regularizers.L2(reg))(inputs)
     else:
-        x = layers.Conv2D(filters, kernel, padding='same', strides=strides ,  kernel_regularizer=tf.keras.regularizers.L2(1e-2))(inputs)
+        x = layers.Conv2D(filters, kernel, padding='same', strides=strides ,  kernel_regularizer=tf.keras.regularizers.L2(reg))(inputs)
 
         #x = layers.Conv2D(512, (1,4), padding='same', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(1e-2))(x)
 
@@ -64,13 +64,14 @@ def _bottleneck(inputs, filters, kernel, t, s, r=False, kernel_regularizer=1):
     x = layers.BatchNormalization()(x)
     x = relu6(x)
 
-    if kernel_regularizer == 1:
+    if kernel_regularizer == 0:
+        x = layers.Conv2D(filters, (1, 1), strides=(1, 1), padding='same', kernel_regularizer=None)(x)
+    elif kernel_regularizer == 1:
         x = layers.Conv2D(filters, (1, 1), strides=(1, 1), padding='same', kernel_regularizer=reg)(x)
-    elif kernel_regularizer == 2:
-        x = layers.Conv2D(filters, kernel, padding='same', strides=(1, 1) , kernel_regularizer=tf.keras.regularizers.L2(reg))(inputs)
     else:
-        x = layers.Conv2D(filters, kernel, padding='same', strides=(1, 1) , kernel_regularizer=tf.keras.regularizers.L2(1e-2))(inputs)
+        x = layers.Conv2D(filters, kernel, padding='same', strides=(1, 1) , kernel_regularizer=tf.keras.regularizers.L2(reg))(inputs)
     
+
     x = layers.BatchNormalization()(x)
 
     if r:
@@ -122,26 +123,26 @@ def vgg_style(x, reg=None):
     The original feature extraction structure from CRNN paper.
     Related paper: https://ieeexplore.ieee.org/abstract/document/7801919
     """
-    x = _conv_block(x ,64 , (3,3) , strides=(1,1), kernel_regularizer=1)
-    #x = layers.Conv2D(64, 3, padding='same', kernel_regularizer=reg)(x)
-    #x = layers.ReLU(6)(x)
+    #x = _conv_block(x ,64 , (3,3) , strides=(1,1), kernel_regularizer=1)
+    x = layers.Conv2D(64, 3, padding='same', kernel_regularizer=reg)(x)
+    x = layers.ReLU(6)(x)
     x = layers.MaxPool2D(pool_size=2, padding='same')(x)
 
-    x = _inverted_residual_block(x, 128 , (3,3) , t = 1 , strides=1 , n=1, kernel_regularizer=1)
-    #x = layers.Conv2D(128, 3, padding='same', use_bias=False, kernel_regularizer=reg)(x)
-    #x = layers.BatchNormalization()(x)
-    #x = layers.ReLU(6)(x)
+    #x = _inverted_residual_block(x, 128 , (3,3) , t = 1 , strides=1 , n=1, kernel_regularizer=0)
+    x = layers.Conv2D(128, 3, padding='same', use_bias=False, kernel_regularizer=reg)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU(6)(x)
     x = layers.MaxPool2D(pool_size=2, padding='same')(x)
 
-    x = _inverted_residual_block(x, 256 , (3,3) , t = 6 , strides=1 , n=1, kernel_regularizer=1)
-    #x = layers.Conv2D(256, 3, padding='same', use_bias=False, kernel_regularizer=reg)(x)
-    #x = layers.BatchNormalization()(x)
-    #x = layers.ReLU(6)(x)
+    #x = _inverted_residual_block(x, 256 , (3,3) , t = 6 , strides=1 , n=1, kernel_regularizer=0)
+    x = layers.Conv2D(256, 3, padding='same', use_bias=False, kernel_regularizer=reg)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU(6)(x)
 
-    x = _inverted_residual_block(x, 256 , (3,3) , t = 6 , strides=1 , n=1, kernel_regularizer=1)
-    #x = layers.Conv2D(256, 3, padding='same', use_bias=False, kernel_regularizer=reg)(x)
-    #x = layers.BatchNormalization()(x)
-    #x = layers.ReLU(6)(x)
+    #x = _inverted_residual_block(x, 256 , (3,3) , t = 6 , strides=1 , n=1, kernel_regularizer=0)
+    x = layers.Conv2D(256, 3, padding='same', use_bias=False, kernel_regularizer=reg)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU(6)(x)
 
     x = layers.MaxPool2D(pool_size=2, strides=(2, 2), padding='same')(x)
 
@@ -306,15 +307,13 @@ def build_model(num_classes,
     x = vgg_style(interpolate_img, reg=tf.keras.regularizers.L2(reg))
     x = layers.Reshape((1, 4, 512))(x)
    
-    x = _inverted_residual_block(x, 512 , (1,4) , t = 6 , strides=1 , n=1, kernel_regularizer=3)
-    #x = layers.Conv2D(512, (1,4), padding='same', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(1e-2))(x)
-    #x = layers.BatchNormalization()(x)
-    #x = layers.ReLU(6)(x)
+    x = layers.Conv2D(512, (1,4), padding='same', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(1e-2))(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU(6)(x)
     
-    x = _inverted_residual_block(x, 512 , (1,4) , t = 6 , strides=1 , n=1, kernel_regularizer=3)
-    #x = layers.Conv2D(512, (1,4), padding='same', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(1e-2))(x)
-    #x = layers.BatchNormalization()(x)
-    #x = layers.ReLU(6)(x)
+    x = layers.Conv2D(512, (1,4), padding='same', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(1e-2))(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU(6)(x)
 
     x = layers.Reshape((-1, 512))(x)
     x = layers.Dense(units=num_classes, name='ctc_logits')(x)
