@@ -8,7 +8,7 @@ reg=1e-3
 
 relu6 = layers.ReLU(6.)
 
-def _conv_block(inputs, filters, kernel, strides):
+def _conv_block(inputs, filters, kernel, strides , kernel_regularizer):
     """Convolution Block
     This function defines a 2D convolution operation with BN and relu6.
     # Arguments
@@ -24,13 +24,17 @@ def _conv_block(inputs, filters, kernel, strides):
         Output tensor.
     """
 
-    x = layers.Conv2D(filters, kernel, padding='same', strides=strides)(inputs)
+    if kernel_regularizer == 1:
+        x = layers.Conv2D(filters, kernel, padding='same', strides=strides ,  kernel_regularizer=reg)(inputs)
+    else:
+        x = layers.Conv2D(filters, kernel, padding='same', strides=strides ,  kernel_regularizer=tf.keras.regularizers.L2(reg))(inputs)
+
     x = layers.BatchNormalization()(x)
     x = relu6(x)
     return x
 
 
-def _bottleneck(inputs, filters, kernel, t, s, r=False):
+def _bottleneck(inputs, filters, kernel, t, s, r=False, kernel_regularizer=1):
     """Bottleneck
     This function defines a basic bottleneck structure.
     # Arguments
@@ -50,20 +54,24 @@ def _bottleneck(inputs, filters, kernel, t, s, r=False):
 
     tchannel = inputs.shape[-1] * t
 
-    x = _conv_block(inputs, tchannel, (1, 1), (1, 1))
+    x = _conv_block(inputs, tchannel, (1, 1), (1, 1), kernel_regularizer)
 
     x = layers.DepthwiseConv2D(kernel, strides=(s, s), depth_multiplier=1, padding='same')(x)
     x = layers.BatchNormalization()(x)
     x = relu6(x)
 
-    x = layers.Conv2D(filters, (1, 1), strides=(1, 1), padding='same')(x)
+    if kernel_regularizer == 1:
+        x = layers.Conv2D(filters, (1, 1), strides=(1, 1), padding='same', kernel_regularizer=reg)(x)
+    else:
+        x = layers.Conv2D(filters, (1, 1), strides=(1, 1), padding='same', kernel_regularizer=tf.keras.regularizers.L2(reg))(x)
+
     x = layers.BatchNormalization()(x)
 
     if r:
         x = layers.add([x, inputs])
     return x
 
-def _inverted_residual_block(inputs, filters, kernel, t, strides, n):
+def _inverted_residual_block(inputs, filters, kernel, t, strides, n , kernel_regularizer):
     """Inverted Residual Block
     This function defines a sequence of 1 or more identical layers.
     # Arguments
@@ -81,10 +89,10 @@ def _inverted_residual_block(inputs, filters, kernel, t, strides, n):
         Output tensor.
     """
 
-    x = _bottleneck(inputs, filters, kernel, t, strides)
+    x = _bottleneck(inputs, filters, kernel, t, strides, kernel_regularizer = kernel_regularizer)
 
     for i in range(1, n):
-        x = _bottleneck(x, filters, kernel, t, 1, True)
+        x = _bottleneck(x, filters, kernel, t, 1, True, kernel_regularizer)
 
     return x
 ##################################################################################################################################
@@ -155,29 +163,34 @@ def build_stn(img, interpolation_size, slice=False, reg=None):
 
     x = layers.MaxPool2D(pool_size=(2, 2))(x)
 
-    x = _conv_block(x ,64 , (5,5) , strides=(1,1))
+    x = _conv_block(x ,64 , (5,5) , strides=(1,1), kernel_regularizer=1)
     x = layers.MaxPool2D(pool_size=(2, 2))(x)
     #x = layers.Conv2D(64, (5, 5), padding='SAME', use_bias=False, kernel_regularizer=reg)(x)
     #x = layers.BatchNormalization()(x)
     #x = layers.ReLU(6)(x)
     #x = layers.MaxPool2D(pool_size=(2, 2))(x)
 
-    x = _inverted_residual_block(x, 128 , (5,5) , t = 1 , strides=1 , n=1) 
+    x = _inverted_residual_block(x, 128 , (5,5) , t = 1 , strides=1 , n=1, kernel_regularizer=1) 
     x = layers.MaxPool2D(pool_size=(2, 2))(x)
     #x = layers.Conv2D(128, (3, 3), padding='SAME', use_bias=False, kernel_regularizer=reg)(x)
     #x = layers.BatchNormalization()(x)
     #x = layers.ReLU(6)(x)
 
-    
-    x1 = layers.Conv2D(128, (3, 3), padding='SAME', dilation_rate=1, use_bias=False, kernel_regularizer=reg)(x)
+    x1 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=1, kernel_regularizer=reg) (x)
+    x1 = layers.Conv2D(128, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=1, kernel_regularizer=reg)(x1)
+    #x1 = layers.Conv2D(128, (3, 3), padding='SAME', dilation_rate=1, use_bias=False, kernel_regularizer=reg)(x)
     x1 = layers.BatchNormalization()(x1)
     x1 = layers.ReLU(6)(x1)
 
-    x2 = layers.Conv2D(128, (3, 3), padding='SAME', dilation_rate=2, use_bias=False, kernel_regularizer=reg)(x)
+    x2 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=2, kernel_regularizer=reg) (x)
+    x2 = layers.Conv2D(128, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=2, kernel_regularizer=reg)(x2)
+    #x2 = layers.Conv2D(128, (3, 3), padding='SAME', dilation_rate=2, use_bias=False, kernel_regularizer=reg)(x)
     x2 = layers.BatchNormalization()(x2)
     x2 = layers.ReLU(6)(x2)
 
-    x3 = layers.Conv2D(128, (3, 3), padding='SAME', dilation_rate=3, use_bias=False, kernel_regularizer=reg)(x)
+    x3 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=3, kernel_regularizer=reg) (x)
+    x3 = layers.Conv2D(128, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=3, kernel_regularizer=reg)(x3)
+    #x3 = layers.Conv2D(128, (3, 3), padding='SAME', dilation_rate=3, use_bias=False, kernel_regularizer=reg)(x)
     x3 = layers.BatchNormalization()(x3)
     x3 = layers.ReLU(6)(x3)
 
@@ -205,39 +218,39 @@ def build_stn2(img, interpolation_size, slice=False):
     w = img.shape[2]
     reg=1e-3
 
-    x = _conv_block(img ,64 , (5,5) , strides=(1,1))
+    x = _conv_block(img ,64 , (5,5) , strides=(1,1), kernel_regularizer=2)
     x = layers.MaxPool2D(pool_size=(2, 2))(x)
     #x = layers.Conv2D(64, (5, 5), padding='SAME', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(reg))(img) # 20
     #x = layers.BatchNormalization()(x)
     #x = layers.ReLU(6)(x)
     #x = layers.MaxPool2D(pool_size=(2, 2))(x)
     
-    x = _inverted_residual_block(x, 128 , (5,5) , t = 1 , strides=1 , n=1) 
+    x = _inverted_residual_block(x, 128 , (5,5) , t = 1 , strides=1 , n=1, kernel_regularizer=2) 
     x = layers.MaxPool2D(pool_size=(2, 2))(x)
     #x = layers.Conv2D(128, (5, 5), padding='SAME', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(reg))(x)
     #x = layers.BatchNormalization()(x)
     #x = layers.ReLU(6)(x)
     #x = layers.MaxPool2D(pool_size=(2, 2))(x)
     
-    x = _inverted_residual_block(x, 256 , (3,3) , t = 6 , strides=2 , n=2) 
+    x = _inverted_residual_block(x, 256 , (3,3) , t = 6 , strides=2 , n=1,  kernel_regularizer=2) 
     #x = layers.Conv2D(256, (3, 3), padding='SAME', use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(reg))(x)
     #x = layers.BatchNormalization()(x)
     #x = layers.ReLU(6)(x)
     
-    x1 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=1) (x)
-    x1 = layers.Conv2D(256, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=1)(x1)
+    x1 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=1, kernel_regularizer=tf.keras.regularizers.L2(reg)) (x)
+    x1 = layers.Conv2D(256, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=1, kernel_regularizer=tf.keras.regularizers.L2(reg))(x1)
     #x1 = layers.Conv2D(256, (3, 3), padding='SAME', dilation_rate=1, use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(reg))(x)
     x1 = layers.BatchNormalization()(x1)
     x1 = layers.ReLU(6)(x1)
 
-    x2 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=2) (x)
-    x2 = layers.Conv2D(256, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=2)(x2)
+    x2 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=2, kernel_regularizer=tf.keras.regularizers.L2(reg)) (x)
+    x2 = layers.Conv2D(256, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=2, kernel_regularizer=tf.keras.regularizers.L2(reg))(x2)
     #x2 = layers.Conv2D(256, (3, 3), padding='SAME', dilation_rate=2, use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(reg))(x)
     x2 = layers.BatchNormalization()(x2)
     x2 = layers.ReLU(6)(x2)
 
     x3 = layers.DepthwiseConv2D( (3,3), (1,1), padding='SAME', use_bias=False, dilation_rate=3) (x)
-    x3 = layers.Conv2D(256, kernel_size=(1,1), strides=(1,1), use_bias=False)(x3)
+    x3 = layers.Conv2D(256, kernel_size=(1,1), strides=(1,1), use_bias=False, dilation_rate=3, kernel_regularizer=tf.keras.regularizers.L2(reg))(x3)
     #x3 = layers.Conv2D(256, (3, 3), padding='SAME', dilation_rate=3, use_bias=False, kernel_regularizer=tf.keras.regularizers.L2(reg))(x)
     x3 = layers.BatchNormalization()(x3)
     x3 = layers.ReLU(6)(x3)
