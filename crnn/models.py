@@ -67,9 +67,9 @@ def _bottleneck(inputs, filters, kernel, t, s, r=False, kernel_regularizer=1):
     if kernel_regularizer == 1:
         x = layers.Conv2D(filters, (1, 1), strides=(1, 1), padding='same', kernel_regularizer=reg)(x)
     elif kernel_regularizer == 2:
-        x = layers.Conv2D(filters, kernel, padding='same', strides=(1, 1) ,  kernel_regularizer=tf.keras.regularizers.L2(reg))(inputs)
+        x = layers.Conv2D(filters, kernel, padding='same', strides=(1, 1) , kernel_regularizer=tf.keras.regularizers.L2(reg))(inputs)
     else:
-        x = layers.Conv2D(filters, kernel, padding='same', strides=(1, 1) ,   kernel_regularizer=tf.keras.regularizers.L2(1e-2))(inputs)
+        x = layers.Conv2D(filters, kernel, padding='same', strides=(1, 1) , kernel_regularizer=tf.keras.regularizers.L2(1e-2))(inputs)
     
     x = layers.BatchNormalization()(x)
 
