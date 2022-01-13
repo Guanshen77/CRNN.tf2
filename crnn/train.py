@@ -11,6 +11,7 @@ from losses import CTCLoss, LossBox, SliceLoss
 from metrics import SequenceAccuracy
 from models import build_model
 from callbacks.callbacks import ImageCallback, ImageCallback2
+import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', type=str, required=True, help='The config file path.')
@@ -116,5 +117,11 @@ callbacks = [
     tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.318, patience=15, min_lr=1e-8, verbose=1),
     tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=51),
 ]
+start = time.time()
+print("The time used to execute this is given below")
+
 model.fit(train_ds, epochs=config['epochs'], callbacks=callbacks, validation_data=val_ds,\
     use_multiprocessing=False, workers=4)
+
+end = time.time()
+print(end - start)
